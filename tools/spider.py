@@ -5,8 +5,14 @@ from scrapy.http import Request
 from scrapy.spider import BaseSpider
 
 project_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if not os.path.exists(os.path.join(project_directory, 'corpus')):
+    os.mkdir(os.path.join(project_directory, 'corpus'))
 save_directory = os.path.join(project_directory, 'corpus/download')
+if not os.path.exists(save_directory):
+    os.mkdir(save_directory)
 extract_directory = os.path.join(project_directory, 'corpus/extracted')
+if not os.path.exists(extract_directory):
+    os.mkdir(extract_directory)
 os.chdir(extract_directory)
 
 
