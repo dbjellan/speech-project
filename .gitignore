@@ -1,2 +1,4 @@
-corpus/download/*
-corpus/extracted/*
+/corpus/download/*
+/corpus/extracted/*
+.idea
+*.pyc
