@@ -30,7 +30,7 @@ class VoxSpeechSpider(BaseSpider):
 
     def save_file(self, response):
         name = response.url.split('/')[-1]
-        print('Downloading and extraction: %s' % (name, ))
+        print('Downloading and extracting: %s' % (name, ))
         path = os.path.join(save_directory, name)
         with open(path, 'wb') as f:
             f.write(response.body)

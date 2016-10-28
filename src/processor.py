@@ -1,7 +1,7 @@
 import os
 import math
 
-from scipy.io import wavfile
+from scikits.audiolab import Sndfile
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -32,7 +32,13 @@ def parse_source(directory):
 
 
 def process_recording(filename, window_width=.1):
-    rate, data = wavfile.read(filename)
+    f = Sndfile(filename, 'r')
+    fs = f.samplerate
+    nc = f.channels
+    enc = f.encoding
+    n = f.nframes
+    data = f.read_frames(n)
+
     samples = int(rate*window_width)
 
     num_windows = int(math.ceil(len(data)/samples))
@@ -57,6 +63,9 @@ def cepstrum(data):
     ceps = np.fft.ifft(np.log(np.abs(spectrum))).real
 
     return ceps
+
+def mel_scale(data):
+    return 2595 * np.log10(1 + np.abs(data)/700.0)
 
 def process_data():
     pass
