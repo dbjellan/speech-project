@@ -47,7 +47,7 @@ def process_recording(filename, window_width=.1):
 
 def graph_spectragram(data, window_width):
     fig, ax = plt.subplots()
-    heatmap = ax.pcolor(data)
+    heatmap = ax.pcolor(abs(data))
     plt.show()
 
 
