@@ -9,8 +9,9 @@ project_directory = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 data_directory = os.path.join(project_directory, 'corpus/extracted')
 sources = os.listdir(data_directory)
 sources.sort()
+sources = map(lambda x: os.path.join(data_directory, x), sources)
 
-def process_source(directory):
+def parse_source(directory):
     wavfiles = []
     promptfile = open(os.path.join(directory, 'etc/PROMPTS'), 'r')
     lines = promptfile.readlines()
