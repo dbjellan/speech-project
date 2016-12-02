@@ -13,11 +13,11 @@ processed_dir = os.path.join(project_dir, 'corpus', 'processed')
 
 
 class Model():
-    def __init__(self, max_timesteps, num_classes, num_features, num_samples, dir):
-        self.max_timesteps = max_timesteps
-        self.num_classes = num_classes
-        self.num_features = num_features
-        self.num_samples = num_samples
+    def __init__(self, dir, max_timesteps, num_classes, num_features, num_samples):
+        self.max_timesteps = int(max_timesteps)
+        self.num_classes = int(num_classes)
+        self.num_features = int(num_features)
+        self.num_samples = int(num_samples)
         self.dir = dir
 
     def pad(self, x):
@@ -36,13 +36,14 @@ class Model():
 
     def get_batch(self, batch_idx, batch_size):
         start_indx = batch_idx*batch_size
-        batch_x = np.zeros((self.max_timesteps, self.batch_size, self.num_features))
+        batch_x = np.zeros((batch_size, self.max_timesteps, self.num_features))
+        print(batch_x.size)
         batch_y = []
         batch_lengths = np.zeros(batch_size)
         for i in range(batch_size):
             with open(os.path.join(self.dir, 'x-' + fname_to_idx(start_indx+i) + '.dat')) as x_file:
                 x = np.load(x_file)
-                batch_x[:, i, :] = self.pad(x)
+                batch_x[i, :, :] = self.pad(x)
             with open(os.path.join(self.dir, 'y-' + fname_to_idx(start_indx+i) + '.dat')) as y_file:
                 y = np.load(y_file)
                 batch_y.append(y)
@@ -134,7 +135,7 @@ def process_text(transcript, phonetic_dict):
 
 
 # processes audio file into np array (num_frames x num_features) using python_speech_features defaults
-def process_recording(audio_file, num_features):
+def process_recording(audio_file, num_features=26):
     fs, audio = wav.read(audio_file)
     coeffs = mfcc(audio, samplerate=fs, nfilt=num_features)
 
@@ -148,8 +149,9 @@ def fname_to_idx(i):
 def process_data(output_dir):
     phonetic_dict, phoneme_ids = build_phonetic_dict()
 
+    #add extra id for null phoneme
     num_classes = len(phoneme_ids)+1
-    num_features = 26
+    num_features = 13
 
     source_dirs = os.listdir(data_dir)
     source_dirs = map(lambda x: os.path.join(data_dir, x), source_dirs)
@@ -165,9 +167,9 @@ def process_data(output_dir):
                 with open(os.path.join(output_dir, 'y-' + fname_to_idx(num_samples + 1) + '.dat'), 'wb') as yf:
                     np.save(yf, encoded_transcript)
 
-                coeffs = process_recording(recording[0], num_features)
-                if coeffs.shape[1] > max_timesteps:
-                    max_timesteps = coeffs.shape[1]
+                coeffs = process_recording(recording[0])
+                if coeffs.shape[0] > max_timesteps:
+                    max_timesteps = coeffs.shape[0]
 
                 with open(os.path.join(output_dir, 'x-' + fname_to_idx(num_samples+1) + '.dat'), 'wb') as input_file:
                     np.save(input_file, coeffs)
@@ -198,15 +200,15 @@ def load_data(dir):
         print('Loading data model...')
         f = open(metadata_file)
         metadata = json.load(f)
-        max_timesteps = metadata['max_timesteps']
         num_classes = metadata['num_classes']
         num_features = metadata['num_features']
         num_samples = metadata['num_samples']
-        model = Model(max_timesteps, num_classes, num_features, num_samples, dir)
+        model = Model(dir, max_timesteps=metadata['max_timesteps'], num_classes=metadata['num_classes'],
+                      num_features=metadata['num_features'], num_samples=metadata['num_samples'])
     else:
         print('Processing data...')
         process_data(dir)
-        load_data()
+        load_data(dir)
 
 
 load_data(processed_dir)
