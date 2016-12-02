@@ -1,5 +1,6 @@
 import os
 import json
+import string
 
 import numpy as np
 import scipy.io.wavfile as wav
@@ -39,10 +40,10 @@ class Model():
         batch_y = []
         batch_lengths = np.zeros(batch_size)
         for i in range(batch_size):
-            with open(os.path.join(self.dir, fname_to_idx(start_indx+i) + '-x')) as x_file:
+            with open(os.path.join(self.dir, 'x-' + fname_to_idx(start_indx+i) + '.dat')) as x_file:
                 x = np.load(x_file)
                 batch_x[:, i, :] = self.pad(x)
-            with open(os.path.join(self.dir, fname_to_idx(start_indx+i) + '-y')) as y_file:
+            with open(os.path.join(self.dir, 'y-' + fname_to_idx(start_indx+i) + '.dat')) as y_file:
                 y = np.load(y_file)
                 batch_y.append(y)
                 batch_lengths[i] = y.shape[-1]
@@ -50,19 +51,36 @@ class Model():
         sparse_y = self.sparse_y(batch_y)
         return batch_x, sparse_y, batch_lengths
 
+def get_prompt_files(dir):
+    # If contains a single prompt files, return that
+    for fname in os.listdir(dir):
+        if 'prompts' in fname.lower():
+            return [os.path.join(dir, fname)]
+    prompts = []
+    for fname in os.listdir(dir):
+        if fname not in ['GPL_License', 'README']:
+            prompts.append(os.path.join(dir, fname))
+    return prompts
+
 
 # returns list of tuples ('sample.wav', transcript) from VoxForge data directory
 def parse_samples(directory):
     wavfiles = []
-    promptfile = open(os.path.join(directory, 'etc/PROMPTS'), 'r')
-    lines = promptfile.readlines()
-    for line in lines:
-        tokens = line.split(' ')
-        path = tokens[0]
-        name = path.split('/')[-1]
-        filename = os.path.join(directory, 'wav/' + name + '.wav')
-        transcript = ' '.join(tokens[1:])
-        wavfiles.append((filename, transcript))
+    prompt_dir = os.path.join(directory, 'etc')
+    promptfiles = get_prompt_files(prompt_dir)
+    for promptfile in promptfiles:
+        with open(promptfile, 'r') as f:
+            lines = f.readlines()
+            for line in lines:
+                line = line.strip()
+                tokens = line.split(' ')
+                if len(tokens) > 2:
+                    path = tokens[0]
+                    name = path.split('/')[-1]
+                    filename = os.path.join(directory, 'wav/' + name + '.wav')
+                    if os.path.exists(filename):
+                        transcript = ' '.join(tokens[1:])
+                        wavfiles.append((filename, transcript))
     return wavfiles
 
 
@@ -89,7 +107,7 @@ def build_phonetic_dict():
             continue
         line = line.strip('\n')
         parts = line.split(' ')
-        word = parts[0]
+        word = parts[0].lower()
         id_seq = map(lambda x: phoneme_ids[x], parts[2:])
         phonetic_dict[word] = id_seq
 
@@ -99,23 +117,32 @@ def build_phonetic_dict():
 
 
 # processes each transcript into a sequence of phoneme ids
-def process_text(transcripts, phonetic_dict):
-    words = transcripts.split(' ')
-    return map(lambda x: phonetic_dict[x], words)
+def process_text(transcript, phonetic_dict):
+    words = transcript.split(' ')
+    phonetic_seq = []
+    unrecognized_word = False
+    for word in words:
+        w_stripped = filter(lambda x: x in string.letters, word.lower())
+        if len(w_stripped) > 0:
+            seq = phonetic_dict.get(w_stripped)
+            if seq:
+                phonetic_seq.extend(seq)
+            else:
+                unrecognized_word = True
+                print('unrecognized word: %s' % (w_stripped,))
+    return np.asarray(phonetic_seq), unrecognized_word
 
 
 # processes audio file into np array (num_frames x num_features) using python_speech_features defaults
 def process_recording(audio_file, num_features):
-    with wav(audio_file) as f:
-        fs, audio = wav.read(f)
-
+    fs, audio = wav.read(audio_file)
     coeffs = mfcc(audio, samplerate=fs, nfilt=num_features)
 
     return coeffs
 
 
-def fname_to_idx(i, dir):
-    return os.path.join(dir, "%05d" % (i, ))
+def fname_to_idx(i):
+    return "%05d" % (i, )
 
 
 def process_data(output_dir):
@@ -133,17 +160,22 @@ def process_data(output_dir):
     for i in range(len(sources)):
         source = sources[i]
         for recording in source:
-            num_samples += 1
-            with open(os.path.join(output_dir, fname_to_idx(num_samples) + '-x'), 'wb') as input_file:
+            encoded_transcript, missing_word = process_text(recording[1], phonetic_dict)
+            if not missing_word:
+                with open(os.path.join(output_dir, 'y-' + fname_to_idx(num_samples + 1) + '.dat'), 'wb') as yf:
+                    np.save(yf, encoded_transcript)
+
                 coeffs = process_recording(recording[0], num_features)
-                np.save(input_file, coeffs)
                 if coeffs.shape[1] > max_timesteps:
                     max_timesteps = coeffs.shape[1]
 
-            with open(os.path.join(output_dir, fname_to_idx(num_samples, output_dir) + '-y'), 'wb') as transcript_file:
-                encoded_transcript = process_text(recording[1], phonetic_dict)
-                np.save(transcript_file, encoded_transcript)
-        print('Processing data: source %d of %d, ~%f percent complete' % (i, len(sources), float(i)/(len(sources))))
+                with open(os.path.join(output_dir, 'x-' + fname_to_idx(num_samples+1) + '.dat'), 'wb') as input_file:
+                    np.save(input_file, coeffs)
+
+                num_samples += 1
+
+        if i % 10 == 0:
+            print('Approximately %2.3f percent complete' % (100*float(i+1)/(len(sources)), ))
 
 
     data = {
@@ -152,8 +184,8 @@ def process_data(output_dir):
         'num_features': num_features,
         'num_samples': num_samples
     }
-    with open(os.path.join(output_dir, 'data.json')) as f:
-        json.dump(f, data)
+    with open(os.path.join(output_dir, 'data.json'), 'w') as f:
+        json.dump(data, f)
 
 
 model = None
