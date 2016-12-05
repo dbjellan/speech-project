@@ -1,4 +1,5 @@
 import os
+import errno
 import json
 import string
 
@@ -10,6 +11,11 @@ from python_speech_features import mfcc
 project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 data_dir = os.path.join(project_dir, 'corpus', 'extracted')
 processed_dir = os.path.join(project_dir, 'corpus', 'processed')
+
+try:
+    os.makedirs(processed_dir)
+except OSError as exc:
+    pass
 
 
 class Model():
