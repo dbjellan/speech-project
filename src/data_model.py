@@ -1,3 +1,5 @@
+#Processes raw data into a usable form
+
 import os
 import errno
 import json
@@ -151,7 +153,7 @@ def process_recording(audio_file, num_features=26):
 def fname_to_idx(i):
     return "%05d" % (i, )
 
-
+#Runs through the data directory, parsing and cleaning data, and saving it for future use
 def process_data(output_dir):
     phonetic_dict, phoneme_ids = build_phonetic_dict()
 
@@ -198,7 +200,7 @@ def process_data(output_dir):
 
 model = None
 
-
+#Initializes data
 def load_data(dir):
     global model
     metadata_file = os.path.join(dir, 'data.json')
