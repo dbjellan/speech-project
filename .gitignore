@@ -2,3 +2,4 @@
 /corpus/extracted/*
 .idea
 *.pyc
+.ipynb_checkpoints
