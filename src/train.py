@@ -6,6 +6,7 @@ from __future__ import division
 from __future__ import print_function
 
 import time
+import os
 import argparse
 
 import tensorflow as tf
@@ -15,14 +16,17 @@ from tensorflow.python.ops import ctc_ops as ctc
 import numpy as np
 
 # load data model
-from data_model import model
+import data_model
+
+model = data_model.Model.load_model(os.path.join(data_model.project_dir, 'corpus', 'testset'))
 
 FLAGS = None
 
-num_hidden = 128
+num_hidden = 64
 num_epochs = 10
-batch_size = 32
+batch_size = 10
 learning_rate = 1.e-3
+momentum = 0.9
 
 
 def bidir_ltsm(x):
@@ -63,7 +67,7 @@ def get_loss(logits3d, target_y, seq_lens):
 
 
 def get_optimizer(loss):
-    return tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss)
+    return tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=momentum).minimize(loss)
 
 
 def get_eval(logits3d, target_y, seq_lens):
