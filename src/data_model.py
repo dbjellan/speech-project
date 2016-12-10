@@ -36,7 +36,7 @@ class Model():
         self.dir = dir
 
     def pad(self, x):
-        pad_num = self.max_timesteps - x.shape[1]
+        pad_num = self.max_timesteps - x.shape[0]
         return np.pad(x, ((0, pad_num), (0, 0)), 'constant', constant_values=0)
 
     def sparse_y(self, batch_y):
@@ -49,20 +49,27 @@ class Model():
         shape = [len(batch_y), np.asarray(idxs).max(0)[1]+1]
         return np.array(idxs), np.array(vals), np.array(shape)
 
-    def get_batch(self, batch_idx, batch_size):
+    def load_data_file(self,index,is_x=True):
+        with open(os.path.join(self.dir, idx_to_fname(index,is_x))) as f:
+            dat = np.load(f)
+            return(dat)
+
+    def load_batch(self,batch_idx,batch_size,is_x=True):
         start_indx = batch_idx*batch_size
-        batch_x = np.zeros((batch_size, self.max_timesteps, self.num_features))
-        print(batch_x.size)
-        batch_y = []
+        batch = np.zeros((batch_size, self.max_timesteps, self.num_features))
         batch_lengths = np.zeros(batch_size)
         for i in range(1, batch_size+1):
-            with open(os.path.join(self.dir, idx_to_fname(start_indx+i))) as x_file:
-                x = np.load(x_file)
-                batch_x[i, :, :] = self.pad(x)
-            with open(os.path.join(self.dir, idx_to_fname(start_indx+i,is_x=False))) as y_file:
-                y = np.load(y_file)
-                batch_y.append(y)
-                batch_lengths[i] = y.shape[-1]
+            dat = self.load_data_file(start_indx+i,is_x) 
+            if is_x:
+                batch[i-1, :, :] = self.pad(dat)
+            else:
+                batch_lengths[i-1] = dat.shape[-1]
+        return batch, batch_lengths
+    
+
+    def get_batch(self, batch_idx, batch_size):
+        batch_x, _ = self.load_batch(batch_idx,batch_size)
+        batch_y, batch_lengths = self.load_batch(batch_idx,batch_size,is_x=False)
 
         sparse_y = self.sparse_y(batch_y)
         return batch_x, sparse_y, batch_lengths
