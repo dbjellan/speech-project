@@ -79,11 +79,9 @@ def get_eval(logits3d, target_y, seq_lens):
 graph = tf.Graph()
 
 
-def train():
+def initialize_training_data():
     sess = tf.InteractiveSession(graph=graph)
 
-    print('Training %d samples in batches of size %d' % (model.num_samples, batch_size,))
-    print('Data info: num classes: %d, num features: %d, num timesteps: %d' % (model.num_classes, model.num_features, model.max_timesteps, ))
     with graph.as_default():
 
         # Initialize model input
@@ -103,8 +101,9 @@ def train():
         optimizer = get_optimizer(loss)
         error_rate, logits_test = get_eval(logits, target_y, seq_lengths)
 
-    print("Initialization finished.")
+    return sess,loss,optimizer,error_rate,logits_test
 
+def train_data(sess,loss,optimizer,error_rate,logits_test):
     sess.run(tf.initialize_all_variables())
 
     num_batches =int(model.num_samples / batch_size)
@@ -120,6 +119,7 @@ def train():
                 target_indxs: t_indxs,
                 target_vals: t_vals,
                 target_shape: t_shape,
+
                 seq_lengths: seq_lengths
             }
             _, l, er, lmt = sess.run([optimizer, loss, error_rate, logits_test], feed_dict=feed_dict)
@@ -128,6 +128,15 @@ def train():
                 print('batch: %d, original indx: %d\nloss: %s\nerror_rate %f. ' %(batch, orig_idx, str(l), er))
         epoch_er = batch_errors.sum() / num_batches
         print("Epoch: %d, error rate: %f", epoch+1, epoch_er)
+
+def train():
+    print('Training %d samples in batches of size %d' % (model.num_samples, batch_size,))
+    print('Data info: num classes: %d, num features: %d, num timesteps: %d' % (model.num_classes, model.num_features, model.max_timesteps, ))
+
+    sess,loss,optimizer,error_rate,logits_test = initialize_training_data()
+    print('Initialization complete')
+    train_data(sess,loss,optimizer,error_rate,logits_test)
+    
 
 
 def main():
