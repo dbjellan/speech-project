@@ -78,6 +78,7 @@ def get_eval(logits3d, target_y, seq_lens):
 
 graph = tf.Graph()
 
+
 def train():
     sess = tf.InteractiveSession(graph=graph)
 
@@ -101,6 +102,8 @@ def train():
         loss = get_loss(logits, target_y, seq_lengths)
         optimizer = get_optimizer(loss)
         error_rate, logits_test = get_eval(logits, target_y, seq_lengths)
+
+    print("Initialization finished.")
 
     sess.run(tf.initialize_all_variables())
 

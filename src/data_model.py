@@ -14,12 +14,18 @@ from python_speech_features import mfcc
 project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 data_dir = os.path.join(project_dir, 'corpus', 'extracted')
 processed_dir = os.path.join(project_dir, 'corpus', 'processed')
+subset_dir = os.path.join(project_dir,'corpus','testset')
 
 try:
     os.makedirs(processed_dir)
 except OSError as exc:
     pass
 
+def idx_to_fname(i, is_x=True):
+    if is_x:
+        return "x-%05d.dat" % (i, )
+    else:
+        return "y-%05d.dat" % (i, )
 
 class Model():
     def __init__(self, dir, max_timesteps, num_classes, num_features, num_samples):
@@ -50,10 +56,10 @@ class Model():
         batch_y = []
         batch_lengths = np.zeros(batch_size)
         for i in range(1, batch_size+1):
-            with open(os.path.join(self.dir, 'x-' + fname_to_idx(start_indx+i) + '.dat')) as x_file:
+            with open(os.path.join(self.dir, idx_to_fname(start_indx+i))) as x_file:
                 x = np.load(x_file)
                 batch_x[i, :, :] = self.pad(x)
-            with open(os.path.join(self.dir, 'y-' + fname_to_idx(start_indx+i) + '.dat')) as y_file:
+            with open(os.path.join(self.dir, idx_to_fname(start_indx+i,is_x=False))) as y_file:
                 y = np.load(y_file)
                 batch_y.append(y)
                 batch_lengths[i] = y.shape[-1]
@@ -89,6 +95,7 @@ def get_prompt_files(dir):
     # If contains a single prompt files, return that
     for fname in os.listdir(dir):
         if 'prompts' in fname.lower():
+
             return [os.path.join(dir, fname)]
     prompts = []
     for fname in os.listdir(dir):
@@ -175,11 +182,6 @@ def process_recording(audio_file, num_features=26):
     return coeffs
 
 
-def idx_to_fname(i, is_x=True):
-    if is_x:
-        return "x-%05d.dat" % (i, )
-    else:
-        return "y-%05d.dat" % (i, )
 
 
 def build_subset(original_model, output_dir, num=1000):
