@@ -79,34 +79,34 @@ def get_eval(logits3d, target_y, seq_lens):
 graph = tf.Graph()
 
 
-def initialize_training_data():
+
+
+def train_data():
     sess = tf.InteractiveSession(graph=graph)
 
     with graph.as_default():
 
         # Initialize model input
         with tf.name_scope('input'):
-            input_x = tf.placeholder(tf.float32, shape=(batch_size, model.num_features, model.max_timesteps))
+            input_x = tf.placeholder(tf.float32, shape=(batch_size, model.max_timesteps, model.num_features))
 
             # converts target y into sparse tensor of shape (batch_size, max(seq_lengths))
             target_indxs = tf.placeholder(tf.int64)
             target_vals = tf.placeholder(tf.int32)
-            seq_lengths = tf.placeholder(tf.int32, shape=(batch_size, ))
+            seq_lengths_placeholder = tf.placeholder(tf.int32, shape=(batch_size, ))
             target_shape = tf.placeholder(tf.int64)
             target_y = tf.SparseTensor(target_indxs, target_vals, target_shape)
 
         # Create model and optimizer
         logits = bidir_ltsm(input_x)
-        loss = get_loss(logits, target_y, seq_lengths)
+        loss = get_loss(logits, target_y, seq_lengths_placeholder)
         optimizer = get_optimizer(loss)
-        error_rate, logits_test = get_eval(logits, target_y, seq_lengths)
-
-    return sess,loss,optimizer,error_rate,logits_test
-
-def train_data(sess,loss,optimizer,error_rate,logits_test):
+        error_rate, logits_test = get_eval(logits, target_y, seq_lengths_placeholder)
     sess.run(tf.initialize_all_variables())
 
     num_batches =int(model.num_samples / batch_size)
+
+    print('Initialization done')
 
     for epoch in range(num_epochs):
         random_batches = np.random.permutation(range(num_batches))
@@ -120,7 +120,7 @@ def train_data(sess,loss,optimizer,error_rate,logits_test):
                 target_vals: t_vals,
                 target_shape: t_shape,
 
-                seq_lengths: seq_lengths
+                seq_lengths_placeholder: seq_lengths
             }
             _, l, er, lmt = sess.run([optimizer, loss, error_rate, logits_test], feed_dict=feed_dict)
             print(np.unique(lmt))
@@ -133,9 +133,10 @@ def train():
     print('Training %d samples in batches of size %d' % (model.num_samples, batch_size,))
     print('Data info: num classes: %d, num features: %d, num timesteps: %d' % (model.num_classes, model.num_features, model.max_timesteps, ))
 
-    sess,loss,optimizer,error_rate,logits_test = initialize_training_data()
-    print('Initialization complete')
-    train_data(sess,loss,optimizer,error_rate,logits_test)
+    #sess,loss,optimizer,error_rate,logits_test = initialize_training_data()
+    #print('Initialization complete')
+    #train_data(sess,loss,optimizer,error_rate,logits_test)
+    train_data()
     
 
 
