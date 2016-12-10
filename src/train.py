@@ -32,7 +32,7 @@ momentum = 0.9
 def bidir_ltsm(x):
     with tf.name_scope('Weights'):
         # Permuting batch_size and n_steps
-        x = tf.transpose(x, [1, 0, 2])
+        x = tf.transpose(x, [2, 0, 1])
         # Reshape to (n_steps*batch_size, n_input)
         x = tf.reshape(x, [-1, model.num_features])
         # Split to get a list of 'n_steps' tensors of shape (batch_size, n_input)
@@ -80,6 +80,32 @@ graph = tf.Graph()
 
 
 
+def train_data_init():
+    sess = tf.InteractiveSession(graph=graph)
+
+    with graph.as_default():
+
+        # Initialize model input
+        with tf.name_scope('input'):
+            input_x = tf.placeholder(tf.float32, shape=(batch_size, model.max_timesteps, model.num_features))
+
+            # converts target y into sparse tensor of shape (batch_size, max(seq_lengths))
+            target_indxs = tf.placeholder(tf.int64)
+            target_vals = tf.placeholder(tf.int32)
+            seq_lengths_placeholder = tf.placeholder(tf.int32, shape=(batch_size, ))
+            target_shape = tf.placeholder(tf.int64)
+            target_y = tf.SparseTensor(target_indxs, target_vals, target_shape)
+
+        # Create model and optimizer
+        logits = bidir_ltsm(input_x)
+        loss = get_loss(logits, target_y, seq_lengths_placeholder)
+        optimizer = get_optimizer(loss)
+        error_rate, logits_test = get_eval(logits, target_y, seq_lengths_placeholder)
+    sess.run(tf.initialize_all_variables())
+
+    num_batches =int(model.num_samples / batch_size)
+    return sess,input_x,target_indxs,target_vals,seq_lengths_placeholder,target_shape,target_y,logits,loss,optimizer,error_rate,logits_test
+
 
 def train_data():
     sess = tf.InteractiveSession(graph=graph)
@@ -115,12 +141,12 @@ def train_data():
             batch_x, target_sparse, seq_lengths = model.get_batch(orig_idx, batch_size)
             t_indxs, t_vals, t_shape = target_sparse
             feed_dict = {
-                input_x: batch_x,
-                target_indxs: t_indxs,
-                target_vals: t_vals,
-                target_shape: t_shape,
+                input_x: batch_x.astype('float32'),
+                target_indxs: t_indxs.astype('int64'),
+                target_vals: t_vals.astype('int32'),
+                target_shape: t_shape.astype('int64'),
 
-                seq_lengths_placeholder: seq_lengths
+                seq_lengths_placeholder: seq_lengths.astype('int32')
             }
             _, l, er, lmt = sess.run([optimizer, loss, error_rate, logits_test], feed_dict=feed_dict)
             print(np.unique(lmt))
