@@ -30,7 +30,7 @@ class Model():
         self.dir = dir
 
     def pad(self, x):
-        pad_num = self.max_timesteps - x.shape[1]
+        pad_num = self.max_timesteps - x.shape[0]
         return np.pad(x, ((0, pad_num), (0, 0)), 'constant', constant_values=0)
 
     def sparse_y(self, batch_y):
@@ -46,17 +46,16 @@ class Model():
     def get_batch(self, batch_idx, batch_size):
         start_indx = batch_idx*batch_size
         batch_x = np.zeros((batch_size, self.max_timesteps, self.num_features))
-        print(batch_x.size)
         batch_y = []
         batch_lengths = np.zeros(batch_size)
         for i in range(1, batch_size+1):
-            with open(os.path.join(self.dir, 'x-' + fname_to_idx(start_indx+i) + '.dat')) as x_file:
+            with open(os.path.join(self.dir, idx_to_fname(start_indx+i))) as x_file:
                 x = np.load(x_file)
-                batch_x[i, :, :] = self.pad(x)
-            with open(os.path.join(self.dir, 'y-' + fname_to_idx(start_indx+i) + '.dat')) as y_file:
+                batch_x[i-1, :, :] = self.pad(x)
+            with open(os.path.join(self.dir, idx_to_fname(start_indx+i, is_x=False))) as y_file:
                 y = np.load(y_file)
                 batch_y.append(y)
-                batch_lengths[i] = y.shape[-1]
+                batch_lengths[i-1] = y.shape[-1]
 
         sparse_y = self.sparse_y(batch_y)
         return batch_x, sparse_y, batch_lengths
@@ -78,9 +77,6 @@ class Model():
             print('Loading data model...')
             f = open(metadata_file)
             metadata = json.load(f)
-            num_classes = metadata['num_classes']
-            num_features = metadata['num_features']
-            num_samples = metadata['num_samples']
             model = Model(dir, max_timesteps=metadata['max_timesteps'], num_classes=metadata['num_classes'],
                       num_features=metadata['num_features'], num_samples=metadata['num_samples'])
             return model
@@ -192,7 +188,7 @@ def build_subset(original_model, output_dir, num=1000):
 
     samples_list.sort()
     selected_samples = samples_list[:num]
-    max_timesteps = selected_samples[-1][0]
+    max_timesteps = max(map(lambda x: x[0], selected_samples))
     feature_sum = np.empty((1, original_model.num_features), dtype='float64')
     for sample in selected_samples:
         fnamex = os.path.join(original_model.dir, idx_to_fname(sample[1]))
@@ -278,7 +274,7 @@ load_data(processed_dir)
 
 
 def main():
-    pass
+    build_subset(main_model, '../corpus/testset')
 
 if __name__ == '__main__':
     main()

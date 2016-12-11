@@ -22,8 +22,8 @@ model = data_model.Model.load_model(os.path.join(data_model.project_dir, 'corpus
 
 FLAGS = None
 
-num_hidden = 64
-num_epochs = 10
+num_hidden = model.num_classes
+num_epochs = 50
 batch_size = 10
 learning_rate = 1.e-3
 momentum = 0.9
@@ -32,7 +32,7 @@ momentum = 0.9
 def bidir_ltsm(x):
     with tf.name_scope('Weights'):
         # Permuting batch_size and n_steps
-        x = tf.transpose(x, [1, 0, 2])
+        #x = tf.transpose(x, [1, 0, 2])
         # Reshape to (n_steps*batch_size, n_input)
         x = tf.reshape(x, [-1, model.num_features])
         # Split to get a list of 'n_steps' tensors of shape (batch_size, n_input)
@@ -78,21 +78,21 @@ def get_eval(logits3d, target_y, seq_lens):
 
 graph = tf.Graph()
 
-def train():
+def train(save_directory='session'):
     sess = tf.InteractiveSession(graph=graph)
 
     print('Training %d samples in batches of size %d' % (model.num_samples, batch_size,))
-    print('Data info: num classes: %d, num features: %d, num timesteps: %d' % (model.num_classes, model.num_features, model.max_timesteps, ))
+    print('Data info: num classes: %d, num features: %d, num timesteps: %d. \nInitializing graph...' % (model.num_classes, model.num_features, model.max_timesteps, ))
     with graph.as_default():
 
         # Initialize model input
         with tf.name_scope('input'):
-            input_x = tf.placeholder(tf.float32, shape=(batch_size, model.num_features, model.max_timesteps))
+            input_x = tf.placeholder(tf.float32, shape=(batch_size, model.max_timesteps, model.num_features))
 
             # converts target y into sparse tensor of shape (batch_size, max(seq_lengths))
             target_indxs = tf.placeholder(tf.int64)
             target_vals = tf.placeholder(tf.int32)
-            seq_lengths = tf.placeholder(tf.int32, shape=(batch_size, ))
+            seq_lengths = tf.placeholder(tf.int32, shape=(batch_size))
             target_shape = tf.placeholder(tf.int64)
             target_y = tf.SparseTensor(target_indxs, target_vals, target_shape)
 
@@ -102,29 +102,36 @@ def train():
         optimizer = get_optimizer(loss)
         error_rate, logits_test = get_eval(logits, target_y, seq_lengths)
 
-    sess.run(tf.initialize_all_variables())
+    init_op = tf.global_variables_initializer()
+    sess.run(init_op)
 
-    num_batches =int(model.num_samples / batch_size)
+    num_batches = int(model.num_samples / batch_size)
+    saver = tf.train.Saver()
 
+    print('Starting training...')
     for epoch in range(num_epochs):
         random_batches = np.random.permutation(range(num_batches))
-        batch_errors = np.zeros(batch_size)
+        batch_errors = np.zeros(num_batches)
         for batch, orig_idx in enumerate(random_batches):
-            batch_x, target_sparse, seq_lengths = model.get_batch(orig_idx, batch_size)
+            batch_x, target_sparse, sequence_lengths = model.get_batch(orig_idx, batch_size)
             t_indxs, t_vals, t_shape = target_sparse
             feed_dict = {
                 input_x: batch_x,
                 target_indxs: t_indxs,
                 target_vals: t_vals,
                 target_shape: t_shape,
-                seq_lengths: seq_lengths
+                seq_lengths: sequence_lengths
             }
             _, l, er, lmt = sess.run([optimizer, loss, error_rate, logits_test], feed_dict=feed_dict)
+            batch_errors[batch] = er
             print(np.unique(lmt))
             if (batch % 1) == 0:
-                print('batch: %d, original indx: %d\nloss: %s\nerror_rate %f. ' %(batch, orig_idx, str(l), er))
+                print('Batch: %d, original indx: %d\tLoss: %s\tError_rate %s. ' %(batch, orig_idx, str(l), str(er)))
+        # save_path = saver.save(sess, os.path.join(save_directory, 'model_epoch%d' % (epoch, )))
         epoch_er = batch_errors.sum() / num_batches
-        print("Epoch: %d, error rate: %f", epoch+1, epoch_er)
+        print("Epoch: %d, error rate: %f" % (epoch+1, epoch_er, ))
+    save_path = saver.save(sess, os.path.join(save_directory, 'model'))
+    sess.close()
 
 
 def main():
