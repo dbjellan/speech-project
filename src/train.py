@@ -130,7 +130,8 @@ def train(save_directory='session'):
         # save_path = saver.save(sess, os.path.join(save_directory, 'model_epoch%d' % (epoch, )))
         epoch_er = batch_errors.sum() / num_batches
         print("Epoch: %d, error rate: %f" % (epoch+1, epoch_er, ))
-    save_path = saver.save(sess, os.path.join(save_directory, 'model'))
+        if epoch != 0 and epoch % 5 == 0:
+            save_path = saver.save(sess, os.path.join(save_directory, 'model' + str(epoch)))
     sess.close()
 
 
